@@ -1,0 +1,622 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>初重执法者配卡分析器</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js">
+    </script>
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', 'Microsoft YaHei', Roboto, sans-serif;
+            background: #f0f2f5; margin: 0; padding: 20px; color: #1a2a3a;
+        }
+        .container { max-width: 1500px; margin: 0 auto; }
+        .card {
+            background: white; border-radius: 24px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.05);
+            padding: 20px 28px; margin-bottom: 28px;
+        }
+        h1 { font-size: 1.9rem; margin: 0 0 6px 0; color: #0b3b5f; }
+        .sub {
+            color: #4a627a; border-left: 4px solid #3b82f6;
+            padding-left: 16px; margin-bottom: 24px; font-size: 0.9rem;
+        }
+        .param-bar {
+            display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-end;
+            margin-bottom: 20px; background: #f8fafc;
+            padding: 16px 20px; border-radius: 32px;
+        }
+        .param-item { display: flex; flex-direction: column; gap: 4px; min-width: 110px; }
+        .param-item label { font-weight: 600; font-size: 0.75rem; color: #2c3e66; }
+        select, input, button {
+            font-size: 0.85rem; padding: 6px 10px; border-radius: 40px;
+            border: 1px solid #cbd5e1; background: white; cursor: pointer; width: 130px;
+        }
+        button {
+            background: #1e4b6e; color: white; border: none;
+            font-weight: bold; padding: 6px 18px; width: auto; white-space: nowrap;
+        }
+        button:hover { background: #0f3b56; transform: translateY(-1px); }
+        .fixed-card {
+            display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-top: 12px;
+        }
+        .fixed-card input { flex: 2; min-width: 220px; width: auto; }
+        .result-area {
+            background: #fefce8; border-radius: 20px; padding: 16px 20px;
+            font-family: monospace; font-size: 0.8rem; overflow-x: auto;
+            white-space: pre-wrap; max-height: 550px; overflow-y: auto;
+            border: 1px solid #fde047;
+        }
+        .chart-container {
+            margin-top: 16px; background: white; padding: 16px;
+            border-radius: 20px; border: 1px solid #e2e8f0;
+        }
+        canvas { max-height: 500px; width: 100%; }
+        .badge {
+            background: #eef2ff; padding: 4px 12px; border-radius: 40px;
+            font-size: 0.75rem; font-weight: 600;
+        }
+        .flex-btns { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 10px; }
+        input[type="number"] { width: 100px; }
+        .info-box {
+            background: #f0f7ff; border-left: 4px solid #3b82f6;
+            padding: 12px 18px; margin-bottom: 16px; border-radius: 12px;
+            font-size: 0.85rem; line-height: 1.6; cursor: pointer;
+        }
+        .info-content {
+            display: none; margin-top: 8px;
+        }
+        .info-box.open .info-content { display: block; }
+        .toggle-btn { color: #1e4b6e; font-weight: 600; user-select: none; }
+        .crit-mode-indicator {
+            display: inline-block;
+            background: #fef3c7; color: #92400e;
+            padding: 3px 10px; border-radius: 20px;
+            font-size: 0.7rem; font-weight: 600; margin-left: 8px; vertical-align: middle;
+        }
+        #thresholdGroup { display: none; }
+        #thresholdGroup.visible { display: flex; }
+        .declaration {
+            background: #fff7ed;
+            border: 1px solid #fdba74;
+            border-radius: 10px;
+            padding: 10px 14px;
+            margin-bottom: 12px;
+            color: #9a3412;
+            font-weight: 500;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="card">
+        <h1>⚔️ 初重执法者配卡分析器</h1>
+        <div class="info-box" id="infoBox" onclick="this.classList.toggle('open')">
+            <span class="toggle-btn">📖 点击展开 / 收起说明</span>
+            <div class="info-content">
+                <div class="declaration">
+                    📢 声明：本程序由DeepSeek生成，未被作者完全验证，不保证没有错误。<br>
+                    欢迎大家随手分享给有需要的人。作者几乎不会编程，如需修改可将本程序发给AI（如DeepSeek）协助修改。
+                </div>
+                <p><strong>预设条件</strong><br>
+                • 光环：<b>腐蚀投射</b>（对满护甲敌人伤害×1.85，但不纳入计算）<br>
+                • 固定携带：<b>双蛇主</b>、<b>镀层增幅线圈</b>、<b>震波</b>、<b>赋能</b> <b>暴露</b><br>
+                • 备选普通卡（10张）：高阶压迫点、高阶热病打击、急进猛突、邪恶蓄力、镀层斩铁、一击必杀、牺牲压迫点、牺牲斩铁、肢解、角斗士威猛<br>
+                • 紫卡词条数值均为同类最大值（带无伤负）：<br>
+                &nbsp;&nbsp;三词条（普通执法者）：基伤 2.293，元素 1.253，连击 34.1，暴击 5.012，爆伤 1.253<br>
+                &nbsp;&nbsp;二词条（普通执法者）：基伤 3.027，元素 1.654，连击 45，暴击 6.616，爆伤 1.654<br>
+                &nbsp;&nbsp;（圣洁执法者缩放后为上述值 ×125/135）<br>
+                • 自定义紫卡需输入 <b>普通执法者</b> 面板数值，暴击无需乘2，系统自动处理</p>
+                <p><strong>额外加成（均为简单加法 / 最终倍率）</strong><br>
+                • 基伤加成：直接加在总基伤区（例：原基伤2.0 + 加成0.6 = 2.6）<br>
+                • 元素加成：直接加在总元素区（例：元素3.4 + 加成0.6 = 4.0）<br>
+                • 暴击加成：直接加在暴击率 x 上（例：x=2.6 + 加成2.0 = 4.6）<br>
+                • 爆伤加成：直接加在爆伤倍率 y 上（例：y=4.5 + 加成0.5 = 5.0）<br>
+                • 额外伤害加成：最终伤害 × (1 + 此值)，例：1 + 0.3 = 1.3 倍</p>
+                <p><strong>⚡ 暴击等级处理模式（整体控制）</strong><br>
+                • <b>期望伤害</b>：x=x，使用暴击期望公式 f = 1 + x·(y-1)，计算平均伤害<br>
+                • <b>伤害下限</b>：x=⌊x⌋（向下取整），按最低暴击等级计算，保守估计<br>
+                • <b>伤害上限</b>：x=⌈x⌉（向上取整），按最高暴击等级计算，乐观估计<br>
+                • <b>自定义阈值</b>：小数部分≥阈值则向上取整，否则向下取整<br>
+                &nbsp;&nbsp;例：阈值0.8时，x=4.7→等级4，x=4.8→等级5，x=5.0→等级5<br>
+                • 暴击等级N的伤害倍率 = 1 + N·(y-1)<br>
+                • <b>不同模式会影响伤害值，进而可能改变配卡排名</b></p>
+                <p>缩放规则：圣洁执法者时紫卡全体 ×125/135 | 所有额外加成为简单加法 | 额外伤害加成为最终乘算 | 暴击等级处理影响伤害计算</p>
+            </div>
+        </div>
+
+        <div class="param-bar">
+            <div class="param-item">
+                <label>⚙️ 执法者类型</label>
+                <select id="typeSelect">
+                    <option value="1">普通执法者</option>
+                    <option value="2" selected>圣洁执法者</option>
+                </select>
+            </div>
+            <div class="param-item">
+                <label>💎 紫陶源力石数量</label>
+                <input type="number" id="nInput" min="0" max="9" value="4" step="1">
+            </div>
+            <div class="param-item">
+                <label>▸ 基伤加成</label>
+                <input type="number" id="baseBonus" value="0" step="0.1">
+            </div>
+            <div class="param-item">
+                <label>▸ 元素加成</label>
+                <input type="number" id="elemBonus" value="0" step="0.1">
+            </div>
+            <div class="param-item">
+                <label>▸ 暴击加成</label>
+                <input type="number" id="critBonus" value="0" step="0.1">
+            </div>
+            <div class="param-item">
+                <label>▸ 爆伤加成</label>
+                <input type="number" id="cdBonus" value="0" step="0.1">
+            </div>
+            <div class="param-item">
+                <label>▸ 额外伤害加成</label>
+                <input type="number" id="exInput" value="0" step="0.01">
+            </div>
+            <div class="param-item">
+                <label>📊 显示前几名</label>
+                <input type="number" id="topK" min="1" max="30" value="8" step="1">
+            </div>
+            <div class="param-item">
+                <label>🎯 暴击等级处理</label>
+                <select id="critModeSelect">
+                    <option value="expected" selected>期望伤害 (x=x)</option>
+                    <option value="floor">伤害下限 (⌊x⌋)</option>
+                    <option value="ceil">伤害上限 (⌈x⌉)</option>
+                    <option value="custom">自定义阈值</option>
+                </select>
+            </div>
+            <div class="param-item" id="thresholdGroup">
+                <label>📏 阈值 (0~1)</label>
+                <input type="number" id="thresholdInput" min="0" max="1" value="0.8" step="0.01">
+            </div>
+        </div>
+
+        <div class="flex-btns">
+            <button id="rankAllBtn">🔍 全紫卡伤害排名</button>
+            <button id="rankFixedBtn">📌 固定紫卡分析</button>
+            <button id="rankNoneBtn">📌 无紫卡分析</button>
+            <button id="drawChartBtn">📈 伤害-紫陶数-紫卡图（顶配）</button>
+        </div>
+
+        <div class="fixed-card">
+            <span class="badge">🎴 紫卡词条 (用于固定紫卡)</span>
+            <input type="text" id="ziSpecInput" placeholder="例: 基伤/暴击/毒  或  暴击2.5/爆伤1.2/基伤2.1">
+            <span style="font-size:0.75rem; color:#475569;">预设查找: 属性名组合 / 自定义数值: 属性+数值</span>
+        </div>
+    </div>
+
+    <div class="card">
+        <div style="display: flex; justify-content: space-between;">
+            <h3>📋 计算结果 <span id="modeIndicator" class="crit-mode-indicator" style="display:none;"></span></h3>
+            <button id="clearBtn" style="background:#6c757d; padding:4px 14px;">清空</button>
+        </div>
+        <div id="output" class="result-area">⚡ 点击上方按钮进行分析...</div>
+    </div>
+
+    <div class="card">
+        <h3>📈 伤害曲线 (随紫陶源力石数量变化)</h3>
+        <div class="chart-container">
+            <canvas id="dmgChart" width="800" height="400"></canvas>
+        </div>
+        <p style="font-size:0.75rem; color:#4b5563;">※ 每个点代表该源力石数量下伤害最高的紫卡，虚线仅作趋势连接，不在图例显示。</p>
+    </div>
+</div>
+
+<script>
+    // ======================== 常量 ========================
+    const ATTR_NAME = ["基伤","元素","连击","暴击","爆伤"];
+    const ATTR_MAP = { "毒": "元素" };
+    const VAL_3 = [2.293, 1.253, 34.1, 5.012, 1.253];
+    const VAL_2 = [3.027, 1.654, 45,   6.616, 1.654];
+    const KA_NAME = [
+        "高阶压迫点","高阶热病打击","急进猛突","邪恶蓄力",
+        "镀层斩铁","一击必杀","牺牲压迫点","牺牲斩铁","肢解",
+        "角斗士威猛"
+    ];
+    const KA = [
+        [1.65,0,0,0,0,0],
+        [0,1.65,0,0,0,0],
+        [0,0,0,0,0,4],
+        [0,0,30,0,0,0],
+        [0,0,0,2.2,1.2,0],
+        [1.2,0,0,0,0,0],
+        [1.1,0,0,0,0,0],
+        [0,0,0,4.4,0,0],
+        [0,0,0,0,0.9,0],
+        [0,0,0,0,0.6,1]
+    ];
+
+    // 生成紫卡（仅属性名）
+    let zi_list = [], zi_name = [], zi_lookup = new Map();
+    function* combinations(arr, k) {
+        if (k === 0) { yield []; return; }
+        for (let i = 0; i <= arr.length - k; i++) {
+            let head = arr[i];
+            for (let tail of combinations(arr.slice(i+1), k-1)) yield [head, ...tail];
+        }
+    }
+    function buildZiCards() {
+        zi_list = []; zi_name = []; zi_lookup.clear();
+        for (let combo of combinations([0,1,2,3,4], 3)) {
+            let card = [0,0,0,0,0,0];
+            for (let idx of combo) card[idx] = VAL_3[idx];
+            zi_list.push(card);
+            zi_name.push(combo.map(i=>ATTR_NAME[i]).join('/'));
+            zi_lookup.set([...combo].sort().join(','), zi_list.length-1);
+        }
+        for (let combo of combinations([0,1,2,3,4], 2)) {
+            let card = [0,0,0,0,0,0];
+            for (let idx of combo) card[idx] = VAL_2[idx];
+            zi_list.push(card);
+            zi_name.push(combo.map(i=>ATTR_NAME[i]).join('/'));
+            zi_lookup.set([...combo].sort().join(','), zi_list.length-1);
+        }
+    }
+    buildZiCards();
+
+    const SCALE_FACTOR = 125.0 / 135.0;
+    function scaleZi(zi, type) {
+        if (type === 2) return zi.map(v => v * SCALE_FACTOR);
+        return [...zi];
+    }
+
+    // 暴击等级处理
+    function getCritMultiplier(x, y, mode, threshold) {
+        let xSafe = Math.max(0, x);
+        let N;
+        switch (mode) {
+            case 'expected':
+                return { N: xSafe, f: 1 + xSafe * (y - 1) };
+            case 'floor':
+                N = Math.floor(xSafe); break;
+            case 'ceil':
+                N = Math.ceil(xSafe); break;
+            case 'custom':
+                let frac = xSafe - Math.floor(xSafe);
+                N = (frac >= threshold) ? Math.ceil(xSafe) : Math.floor(xSafe);
+                break;
+            default:
+                return { N: xSafe, f: 1 + xSafe * (y - 1) };
+        }
+        let f = 1 + N * (y - 1);
+        return { N, f };
+    }
+
+    // 伤害计算
+    function shanghai(type, v, n, baseB, elemB, critB, cdB, ex, critMode, threshold) {
+        let mianban, x0, y0;
+        if (type === 1) { mianban = 730; x0 = 0.36; y0 = 3; }
+        else { mianban = 740; x0 = 0.42; y0 = 2.2; }
+        let jishang = 2 + v[0] + baseB;
+        let yuansu = 3.4 + v[1] + elemB;
+        let lianji_beilv = Math.floor((130 + v[2]) / 20);
+        let x = x0 * (1 + v[3] + 0.1 * v[5] * (lianji_beilv - 1)) + critB;
+        let y = y0 * (1 + v[4] + 0.75 * n) + cdB;
+        let { f } = getCritMultiplier(x, y, critMode, threshold);
+        return 6 * mianban * jishang * yuansu * lianji_beilv * f * (1 + ex);
+    }
+
+    function critX(type, v, critB) {
+        let x0 = type === 1 ? 0.36 : 0.42;
+        let lianji_beilv = Math.floor((130 + v[2]) / 20);
+        return x0 * (1 + v[3] + 0.1 * v[5] * (lianji_beilv - 1)) + critB;
+    }
+
+    function* iterCombos(comboLen) {
+        let all = [0,1,2,3,4,5,6,7,8,9];
+        for (let combo of combinations(all, comboLen)) {
+            if (combo.includes(0) && combo.includes(6)) continue;
+            if (combo.includes(4) && combo.includes(7)) continue;
+            let cards = combo.map(i => [...KA[i]]);
+            if (combo.includes(6) && combo.includes(7)) {
+                let i6 = combo.indexOf(6), i7 = combo.indexOf(7);
+                for (let j=0; j<6; j++) {
+                    cards[i6][j] *= 1.25;
+                    cards[i7][j] *= 1.25;
+                }
+            }
+            let base = [0,0,0,0,0,0];
+            for (let c of cards) for (let i=0; i<6; i++) base[i] += c[i];
+            yield { combo, base };
+        }
+    }
+
+    function findZiIndex(spec) {
+        if (typeof spec === 'number' && spec>=0 && spec<zi_list.length) return spec;
+        let parts = typeof spec === 'string' ? spec.split(/[/\s、,]+/) : (Array.isArray(spec) ? spec : []);
+        let attrs = [];
+        for (let p of parts) {
+            let clean = p.trim();
+            if (!clean) continue;
+            let mapped = ATTR_MAP[clean] || clean;
+            let idx = ATTR_NAME.indexOf(mapped);
+            if (idx !== -1 && !attrs.includes(idx)) attrs.push(idx);
+        }
+        if (!attrs.length) return null;
+        attrs.sort((a,b)=>a-b);
+        return zi_lookup.get(attrs.join(',')) ?? null;
+    }
+
+    function parseCustomZi(spec) {
+        let parts = spec.split(/[/\s、,]+/);
+        let card = [0,0,0,0,0,0];
+        let found = false;
+        for (let p of parts) {
+            let m = p.match(/^([^\d]+?)(\d+\.?\d*)$/);
+            if (!m) continue;
+            let name = m[1].trim();
+            let val = parseFloat(m[2]);
+            let idx = ATTR_NAME.indexOf(ATTR_MAP[name] || name);
+            if (idx === -1) continue;
+            card[idx] = val;
+            found = true;
+        }
+        if (!found) return null;
+        card[3] *= 2.0;
+        return card;
+    }
+
+    function getCritModeDescription(critMode, threshold) {
+        switch (critMode) {
+            case 'expected': return '期望伤害 (x=x)';
+            case 'floor': return '伤害下限 (⌊x⌋)';
+            case 'ceil': return '伤害上限 (⌈x⌉)';
+            case 'custom': return `自定义阈值 (≥${threshold.toFixed(2)}向上取整)`;
+            default: return '期望伤害 (x=x)';
+        }
+    }
+
+    function fenxi(type, n, baseB, elemB, critB, cdB, ex, topK, critMode, threshold, verbose=false) {
+        let zi_w = zi_list.map(zi => scaleZi(zi, type));
+        let typeStr = type === 1 ? "普通执法者" : "圣洁执法者";
+        let modeDesc = getCritModeDescription(critMode, threshold);
+        let results = [];
+        for (let {combo, base} of iterCombos(5)) {
+            for (let ziIdx=0; ziIdx<zi_w.length; ziIdx++) {
+                let z = zi_w[ziIdx];
+                if (z[2] < 20 && !combo.includes(3)) continue;
+                let v = base.map((x,i) => x + z[i]);
+                let d = shanghai(type, v, n, baseB, elemB, critB, cdB, ex, critMode, threshold);
+                let cx = critX(type, v, critB);
+                results.push({d, combo, ziIdx, cx});
+            }
+        }
+        results.sort((a,b)=>b.d - a.d);
+        let top = results.slice(0, topK);
+        if (!verbose) return results;
+        let out = `${typeStr}, 紫陶源力石数量=${n} | 暴击模式: ${modeDesc}\n基伤+${baseB}, 元素+${elemB}, 暴击+${critB}, 爆伤+${cdB}, 额外伤害加成=${ex}, 伤害前${topK}:\n` + "─".repeat(90) + "\n";
+        for (let i=0;i<top.length;i++) {
+            let r = top[i];
+            let cardsStr = r.combo.map(idx=>KA_NAME[idx]).join(", ");
+            let dmgStr = r.d.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+            out += `${(i+1).toString().padStart(2)}. 伤害=${dmgStr} | ${cardsStr} | ${zi_name[r.ziIdx]} | 暴击率=${r.cx.toFixed(4)}\n`;
+        }
+        out += "─".repeat(90);
+        return out;
+    }
+
+    function fenxiFixed(type, n, baseB, elemB, critB, cdB, ex, topK, ziSpec, critMode, threshold, verbose=false) {
+        let zi_w = null, desc = null, comboLen = 6;
+        if (ziSpec && ziSpec !== "") {
+            let custom = parseCustomZi(ziSpec);
+            if (custom) {
+                zi_w = scaleZi(custom, type);
+                desc = `固定自定义紫卡: ${ziSpec}`;
+                comboLen = 5;
+            } else {
+                let ziIdx = findZiIndex(ziSpec);
+                if (ziIdx !== null) {
+                    zi_w = scaleZi(zi_list[ziIdx], type);
+                    desc = `固定紫卡: ${zi_name[ziIdx]}`;
+                    comboLen = 5;
+                } else {
+                    if (verbose) return "❌ 无效的紫卡词条";
+                    else return [];
+                }
+            }
+        }
+        if (!zi_w) {
+            comboLen = 6;
+            desc = "不带紫卡（6张普通卡）";
+        }
+        let typeStr = type === 1 ? "普通执法者" : "圣洁执法者";
+        let modeDesc = getCritModeDescription(critMode, threshold);
+        let results = [];
+        for (let {combo, base} of iterCombos(comboLen)) {
+            let v = base.slice();
+            if (zi_w) for (let i=0;i<6;i++) v[i] += zi_w[i];
+            if (zi_w && zi_w[2] < 20 && !combo.includes(3)) continue;
+            let d = shanghai(type, v, n, baseB, elemB, critB, cdB, ex, critMode, threshold);
+            let cx = critX(type, v, critB);
+            results.push({d, combo, cx});
+        }
+        results.sort((a,b)=>b.d - a.d);
+        let top = results.slice(0, topK);
+        if (!verbose) return results;
+        let out = `${desc} | ${typeStr}, 紫陶源力石数量=${n} | 暴击模式: ${modeDesc}\n基伤+${baseB}, 元素+${elemB}, 暴击+${critB}, 爆伤+${cdB}, 额外伤害加成=${ex}, 伤害前${topK}:\n` + "─".repeat(90) + "\n";
+        for (let i=0;i<top.length;i++) {
+            let r = top[i];
+            let cardsStr = r.combo.map(idx=>KA_NAME[idx]).join(", ");
+            let dmgStr = r.d.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+            out += `${(i+1).toString().padStart(2)}. 伤害=${dmgStr} | ${cardsStr} | 暴击率=${r.cx.toFixed(4)}\n`;
+        }
+        out += "─".repeat(90);
+        return out;
+    }
+
+    let currentChart = null;
+    function drawCurve(type, baseB, elemB, critB, cdB, ex, critMode, threshold) {
+        let nRange = [...Array(10).keys()];
+        let bestData = [];
+        for (let n of nRange) {
+            let res = fenxi(type, n, baseB, elemB, critB, cdB, ex, 1, critMode, threshold, false);
+            if (res.length) bestData.push({n, ziIdx: res[0].ziIdx, dmgM: res[0].d/1e6});
+        }
+        let groups = new Map();
+        for (let p of bestData) {
+            if (!groups.has(p.ziIdx)) groups.set(p.ziIdx, {x:[], y:[], name: zi_name[p.ziIdx]});
+            let g = groups.get(p.ziIdx);
+            g.x.push(p.n);
+            g.y.push(p.dmgM);
+        }
+        let datasets = [];
+        let colors = ['#e6194b','#3cb44b','#ffe119','#4363d8','#f58231','#911eb4','#46f0f0','#f032e6','#bcf60c','#fabebe','#008080','#e6beff','#9a6324','#fffac8','#800000','#aaffc3','#808000','#ffd8b1','#000075','#a9a9a9'];
+        for (let [ziIdx, g] of groups.entries()) {
+            let col = colors[ziIdx % colors.length];
+            datasets.push({
+                label: g.name,
+                data: g.x.map((x,i)=>({x, y:g.y[i]})),
+                type: 'scatter', backgroundColor: col, borderColor: col,
+                showLine: false, pointRadius: 6, order: 1
+            });
+            if (g.x.length > 1) {
+                datasets.push({
+                    label: '',
+                    data: g.x.map((x,i)=>({x, y:g.y[i]})),
+                    type: 'line', borderColor: col, backgroundColor: 'transparent',
+                    borderWidth: 2, borderDash: [5,5], fill: false,
+                    pointRadius: 0, order: 0
+                });
+            }
+        }
+        let ctx = document.getElementById('dmgChart').getContext('2d');
+        if (currentChart) currentChart.destroy();
+        let typeStr = type === 1 ? "普通执法者" : "圣洁执法者";
+        let modeDesc = getCritModeDescription(critMode, threshold);
+        currentChart = new Chart(ctx, {
+            data: { datasets },
+            options: {
+                responsive: true,
+                plugins: {
+                    title: {
+                        display: true,
+                        text: `${typeStr} | 暴击模式: ${modeDesc}`,
+                        font: { size: 13 },
+                        padding: { bottom: 8 }
+                    },
+                    tooltip: { callbacks: { label: (c) => `${c.dataset.label || ''}: ${c.parsed.y.toFixed(2)} 百万伤害` } },
+                    legend: {
+                        position: 'bottom',
+                        labels: {
+                            font: { size: 10 }, boxWidth: 12,
+                            filter: function(item, data) {
+                                return item.text !== '';
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: { title: { display: true, text: '紫陶源力石数量' }, min:0, max:9, ticks: { stepSize:1 } },
+                    y: { title: { display: true, text: '伤害 (百万)' } }
+                }
+            }
+        });
+    }
+
+    const outputDiv = document.getElementById('output');
+    const typeSelect = document.getElementById('typeSelect');
+    const nInput = document.getElementById('nInput');
+    const baseBonus = document.getElementById('baseBonus');
+    const elemBonus = document.getElementById('elemBonus');
+    const critBonus = document.getElementById('critBonus');
+    const cdBonus = document.getElementById('cdBonus');
+    const exInput = document.getElementById('exInput');
+    const topKInput = document.getElementById('topK');
+    const ziSpecInput = document.getElementById('ziSpecInput');
+    const critModeSelect = document.getElementById('critModeSelect');
+    const thresholdInput = document.getElementById('thresholdInput');
+    const thresholdGroup = document.getElementById('thresholdGroup');
+    const modeIndicator = document.getElementById('modeIndicator');
+
+    critModeSelect.addEventListener('change', function() {
+        if (this.value === 'custom') {
+            thresholdGroup.classList.add('visible');
+        } else {
+            thresholdGroup.classList.remove('visible');
+        }
+    });
+    if (critModeSelect.value === 'custom') {
+        thresholdGroup.classList.add('visible');
+    }
+
+    function getParams() {
+        let critMode = critModeSelect.value;
+        let threshold = parseFloat(thresholdInput.value) || 0.8;
+        threshold = Math.max(0, Math.min(1, threshold));
+        return {
+            type: parseInt(typeSelect.value),
+            n: parseInt(nInput.value),
+            baseB: parseFloat(baseBonus.value) || 0,
+            elemB: parseFloat(elemBonus.value) || 0,
+            critB: parseFloat(critBonus.value) || 0,
+            cdB: parseFloat(cdBonus.value) || 0,
+            ex: parseFloat(exInput.value) || 0,
+            topK: parseInt(topKInput.value),
+            critMode: critMode,
+            threshold: threshold
+        };
+    }
+
+    function updateModeIndicator(p) {
+        let desc = getCritModeDescription(p.critMode, p.threshold);
+        modeIndicator.textContent = '🎯 ' + desc;
+        modeIndicator.style.display = 'inline-block';
+    }
+
+    document.getElementById('rankAllBtn').onclick = () => {
+        let p = getParams();
+        updateModeIndicator(p);
+        outputDiv.innerText = "⏳ 计算中...";
+        setTimeout(() => {
+            outputDiv.innerText = fenxi(p.type, p.n, p.baseB, p.elemB, p.critB, p.cdB, p.ex, p.topK, p.critMode, p.threshold, true);
+        }, 10);
+    };
+
+    document.getElementById('rankFixedBtn').onclick = () => {
+        let p = getParams();
+        let spec = ziSpecInput.value.trim();
+        if (!spec) {
+            outputDiv.innerText = "❌ 请在下方输入框填写紫卡词条";
+            modeIndicator.style.display = 'none';
+            return;
+        }
+        updateModeIndicator(p);
+        outputDiv.innerText = "⏳ 分析中...";
+        setTimeout(() => {
+            outputDiv.innerText = fenxiFixed(p.type, p.n, p.baseB, p.elemB, p.critB, p.cdB, p.ex, p.topK, spec, p.critMode, p.threshold, true);
+        }, 10);
+    };
+
+    document.getElementById('rankNoneBtn').onclick = () => {
+        let p = getParams();
+        updateModeIndicator(p);
+        outputDiv.innerText = "⏳ 分析中（无紫卡）...";
+        setTimeout(() => {
+            outputDiv.innerText = fenxiFixed(p.type, p.n, p.baseB, p.elemB, p.critB, p.cdB, p.ex, p.topK, null, p.critMode, p.threshold, true);
+        }, 10);
+    };
+
+    document.getElementById('drawChartBtn').onclick = () => {
+        let p = getParams();
+        updateModeIndicator(p);
+        outputDiv.innerText = `📊 绘制曲线 (${p.type===1?"普通":"圣洁"}执法者, +基${p.baseB}, +元${p.elemB}, +暴${p.critB}, +爆${p.cdB}, 加成${p.ex}, 暴击模式: ${getCritModeDescription(p.critMode, p.threshold)})...`;
+        drawCurve(p.type, p.baseB, p.elemB, p.critB, p.cdB, p.ex, p.critMode, p.threshold);
+        setTimeout(() => outputDiv.innerText = "✅ 曲线绘制完成", 50);
+    };
+
+    document.getElementById('clearBtn').onclick = () => {
+        outputDiv.innerHTML = "✨ 已清空 ✨";
+        modeIndicator.style.display = 'none';
+        if (currentChart) { currentChart.destroy(); currentChart = null; }
+        document.getElementById('dmgChart').getContext('2d').clearRect(0,0,800,400);
+    };
+</script>
+</body>
+</html>
