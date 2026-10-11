@@ -106,7 +106,7 @@
                 • 固定携带：<b>镀层增幅线圈</b>、<b>赋能暴露</b><br>
                 • 魔导侵略：+300%爆伤，相当于4个紫陶<br>
                 • 灵化自带：自带+1基伤，灵化还会把面板提升到730（普通）/740（圣洁）<br>
-                • 灵化连击：执法者需 <b>120 连击</b>才能开启灵化（初始连击100 + 灵化自带30）；配卡必须带<b>邪恶蓄力</b>或<b>紫卡连击词条</b>才够，否则该配卡不成立<br>
+                • 灵化连击：需 <b>6 层连击（100 连击）</b>才能开启灵化（镀层增幅线圈 +80 初始连击；灵化自带的 +30 要开启后才生效，不能用来凑开启线）；配卡必须带<b>邪恶蓄力</b>或<b>紫卡连击词条</b>才够<br>
                 • 备选普通卡（11张）：高阶压迫点、高阶热病打击、急进猛突、邪恶蓄力、镀层斩铁、一击必杀、牺牲压迫点、牺牲斩铁、肢解、角斗士威猛、震波<br>
                 • 紫卡词条数值均为同类最大值（带无伤负）：<br>
                 &nbsp;&nbsp;三词条（普通执法者）：基伤 2.293，元素 1.253，连击 34.1，暴击 5.012，爆伤 1.253，<b>震地 1.666</b>，<b>融合基伤 1.666</b><br>
@@ -290,10 +290,10 @@
 
     // 槽位: 8 近战槽 = 固定(镀层增幅线圈)1 + [紫卡1] + 可选
     // 连击与灵化（执法者）
-    const PRE_COMBO      = 100;   // 开启灵化前能拿到的初始连击（镀层增幅线圈）
-    const INCARNON_COMBO = 30;    // 灵化形态自带 +30 初始连击（开启后才生效）
-    const ACTIVATION_REQ = 120;   // 执法者开启灵化所需连击数
-    const BASE_COMBO     = PRE_COMBO + INCARNON_COMBO;   // 130
+    const PRE_COMBO      = 80;    // 镀层增幅线圈：+80 初始连击
+    const INCARNON_COMBO = 30;    // 灵化形态自带 +30 初始连击（开启后才生效，不能用来凑开启线）
+    const ACTIVATION_REQ = 100;   // 灵化开启线 = 6 层 = 100 连击
+    const BASE_COMBO     = PRE_COMBO + INCARNON_COMBO;   // 110
 
     const MELEE_SLOTS = 8;
     const FIXED_SLOTS = 1;
@@ -366,8 +366,8 @@
 
         let jishang = 2 + v[0] + p.baseB;
         let yuansu  = 3.4 + v[1] + p.elemB;
-        // 连击倍率 = floor(连击数/20)：120连击=6x（灵化开启线）、160连击=8x、220连击=11x
-        let lianji_beilv = Math.floor((BASE_COMBO + v[2]) / 20);
+        // 连击倍率 = 1 + floor(连击数/20)：100连击=6x（灵化开启线）、160连击=8x、220连击=12x
+        let lianji_beilv = 1 + Math.floor((BASE_COMBO + v[2]) / 20);
         if (PRE_COMBO + v[2] < ACTIVATION_REQ) return 0;   // 连击不足以开启灵化 → 该配卡不成立
         let x = x0 * (1 + v[3] + 0.1 * v[5] * (lianji_beilv - 1)) + p.critB;
         let y = y0 * (1 + v[4] + 0.75 * n) + p.cdB;
@@ -383,7 +383,7 @@
 
     function critX(type, v, p) {
         let x0 = type === 1 ? 0.36 : 0.42;
-        let lianji_beilv = Math.floor((BASE_COMBO + v[2]) / 20);
+        let lianji_beilv = 1 + Math.floor((BASE_COMBO + v[2]) / 20);
         if (PRE_COMBO + v[2] < ACTIVATION_REQ) return 0;   // 连击不足以开启灵化 → 该配卡不成立
         return x0 * (1 + v[3] + 0.1 * v[5] * (lianji_beilv - 1)) + p.critB;
     }
@@ -530,7 +530,7 @@
             for (let ziIdx = 0; ziIdx < zi_w.length; ziIdx++) {
                 let z = zi_w[ziIdx];
                 let v = base.map((x, i) => x + z[i]);
-                // 开不了灵化就不成立：需要 初始连击 + 邪恶蓄力/紫卡连击 ≥ 120
+                // 开不了灵化就不成立：镀层80 + 邪恶蓄力/紫卡连击 ≥ 100（= 6 层）
                 if (PRE_COMBO + v[2] < ACTIVATION_REQ) continue;
                 let d = shanghai(type, v, n, p);
                 let cx = critX(type, v, p);
@@ -576,7 +576,7 @@
         for (let { combo, base } of iterCombos(comboLen)) {
             let v = base.slice();
             if (zi_w) for (let i = 0; i < NC; i++) v[i] += zi_w[i];
-            if (PRE_COMBO + v[2] < ACTIVATION_REQ) continue;   // 开不了灵化
+            if (PRE_COMBO + v[2] < ACTIVATION_REQ) continue;   // 开不了灵化（80 + v[2] < 100）
             let d = shanghai(type, v, n, p);
             let cx = critX(type, v, p);
             results.push({ d, combo, cx });
