@@ -106,7 +106,7 @@
                 • 固定携带：<b>镀层增幅线圈</b>、<b>赋能暴露</b><br>
                 • 魔导侵略：+300%爆伤，相当于4个紫陶<br>
                 • 灵化自带：自带+1基伤，灵化还会把面板提升到730（普通）/740（圣洁）<br>
-                • 灵化连击：需 <b>6 层连击（100 连击）</b>才能开启灵化（镀层增幅线圈 +80 初始连击；灵化自带的 +30 要开启后才生效，不能用来凑开启线）；配卡必须带<b>邪恶蓄力</b>或<b>紫卡连击词条</b>才够<br>
+                • 灵化连击：需 <b>6 层连击（100 连击）</b>才能开启灵化（镀层增幅线圈 +80 初始连击；灵化自带的 +30 要开启后才生效，不能用来凑开启线）；配卡必须带<b>邪恶蓄力</b>、<b>紫卡连击词条</b>或<b>连击加成</b>才够<br>
                 • 备选普通卡（11张）：高阶压迫点、高阶热病打击、急进猛突、邪恶蓄力、镀层斩铁、一击必杀、牺牲压迫点、牺牲斩铁、肢解、角斗士威猛、震波<br>
                 • 紫卡词条数值均为同类最大值（带无伤负）：<br>
                 &nbsp;&nbsp;三词条（普通执法者）：基伤 2.293，元素 1.253，连击 34.1，暴击 5.012，爆伤 1.253，<b>震地 1.666</b>，<b>融合基伤 1.666</b><br>
@@ -120,6 +120,7 @@
                 • 暴击加成：直接加在暴击率 x 上（例：x=2.6 + 加成2.0 = 4.6）<br>
                 • 爆伤加成：直接加在爆伤倍率 y 上（例：y=4.5 + 加成0.5 = 5.0）<br>
                 • 震地加成：直接加在震地区（例：原震地1.0 + 加成2.0 = 3.0）<br>
+                • 连击加成：直接加在总连击数上（例：原连击110 + 加成20 = 130）<br>
                 • 额外伤害加成：伤害 × (1 + 此值)</p>
                 <p><strong>⚡ 暴击等级是n？n+1？</strong><br>
                 • <b>期望伤害</b>：x=x，使用暴击期望公式 f = 1 + x·(y-1)，计算平均伤害<br>
@@ -167,6 +168,10 @@
                 <input type="number" id="slamBonus" value="0" step="0.1">
             </div>
             <div class="param-item">
+                <label for="comboBonus">▸ 连击加成</label>
+                <input type="number" id="comboBonus" value="0" step="1">
+            </div>
+            <div class="param-item">
                 <label for="exInput">▸ 额外伤害加成</label>
                 <input type="number" id="exInput" value="0" step="0.01">
             </div>
@@ -177,8 +182,8 @@
             <div class="param-item">
                 <label for="critModeSelect">🎯 暴击等级处理</label>
                 <select id="critModeSelect">
-                    <option value="expected" selected>期望伤害 (x=x)</option>
-                    <option value="floor">伤害下限 (N=⌊x⌋)</option>
+                    <option value="expected">期望伤害 (x=x)</option>
+                    <option value="floor" selected>伤害下限 (N=⌊x⌋)</option>
                     <option value="ceil">伤害上限 (N=⌈x⌉)</option>
                     <option value="custom">自定义阈值</option>
                 </select>
@@ -366,9 +371,11 @@
 
         let jishang = 2 + v[0] + p.baseB;
         let yuansu  = 3.4 + v[1] + p.elemB;
-        // 连击倍率 = 1 + floor(连击数/20)：100连击=6x（灵化开启线）、160连击=8x、220连击=12x
-        let lianji_beilv = 1 + Math.floor((BASE_COMBO + v[2]) / 20);
-        if (PRE_COMBO + v[2] < ACTIVATION_REQ) return 0;   // 连击不足以开启灵化 → 该配卡不成立
+        // 连击数 = 卡牌/紫卡的连击词条 + 手动连击加成
+        let combo = v[2] + p.comboBonus;
+        // 连击倍率 = 1 + floor(连击数/20)，220 连击封顶 12x（wiki：12.0x 上限，13x 只有 Venka Prime）
+        let lianji_beilv = Math.min(12, 1 + Math.floor((BASE_COMBO + combo) / 20));
+        if (PRE_COMBO + combo < ACTIVATION_REQ) return 0;   // 连击不足以开启灵化 → 该配卡不成立
         let x = x0 * (1 + v[3] + 0.1 * v[5] * (lianji_beilv - 1)) + p.critB;
         let y = y0 * (1 + v[4] + 0.75 * n) + p.cdB;
         let { f } = getCritMultiplier(x, y, p.critMode, p.threshold);
@@ -383,8 +390,9 @@
 
     function critX(type, v, p) {
         let x0 = type === 1 ? 0.36 : 0.42;
-        let lianji_beilv = 1 + Math.floor((BASE_COMBO + v[2]) / 20);
-        if (PRE_COMBO + v[2] < ACTIVATION_REQ) return 0;   // 连击不足以开启灵化 → 该配卡不成立
+        let combo = v[2] + p.comboBonus;
+        let lianji_beilv = Math.min(12, 1 + Math.floor((BASE_COMBO + combo) / 20));
+        if (PRE_COMBO + combo < ACTIVATION_REQ) return 0;   // 连击不足以开启灵化 → 该配卡不成立
         return x0 * (1 + v[3] + 0.1 * v[5] * (lianji_beilv - 1)) + p.critB;
     }
 
@@ -530,8 +538,8 @@
             for (let ziIdx = 0; ziIdx < zi_w.length; ziIdx++) {
                 let z = zi_w[ziIdx];
                 let v = base.map((x, i) => x + z[i]);
-                // 开不了灵化就不成立：镀层80 + 邪恶蓄力/紫卡连击 ≥ 100（= 6 层）
-                if (PRE_COMBO + v[2] < ACTIVATION_REQ) continue;
+                // 开不了灵化就不成立：镀层80 + 邪恶蓄力/紫卡连击 + 手动连击加成 ≥ 100（= 6 层）
+                if (PRE_COMBO + v[2] + p.comboBonus < ACTIVATION_REQ) continue;
                 let d = shanghai(type, v, n, p);
                 let cx = critX(type, v, p);
                 results.push({ d, combo, ziIdx, cx });
@@ -541,7 +549,7 @@
         if (!verbose) return results;
         let top = results.slice(0, topK);
         let out = `${typeStr}, 紫陶源力石数量=${n} | 暴击模式: ${modeDesc}\n`
-                + `基伤+${p.baseB}, 元素+${p.elemB}, 暴击+${p.critB}, 爆伤+${p.cdB}, 震地+${p.slamBonus}, 额外伤害加成=${p.ex}\n`
+                + `基伤+${p.baseB}, 元素+${p.elemB}, 暴击+${p.critB}, 爆伤+${p.cdB}, 震地+${p.slamBonus}, 连击+${p.comboBonus}, 额外伤害加成=${p.ex}\n`
                 + `蛇主${(p.nira/NIRA_PER).toFixed(0)}件(+${fmtPct(p.nira)}震地) | 伤害前${topK}:\n`
                 + "─".repeat(104) + "\n"
                 + renderRows(top) + "\n"
@@ -576,7 +584,7 @@
         for (let { combo, base } of iterCombos(comboLen)) {
             let v = base.slice();
             if (zi_w) for (let i = 0; i < NC; i++) v[i] += zi_w[i];
-            if (PRE_COMBO + v[2] < ACTIVATION_REQ) continue;   // 开不了灵化（80 + v[2] < 100）
+            if (PRE_COMBO + v[2] + p.comboBonus < ACTIVATION_REQ) continue;   // 开不了灵化（80 + v[2] + 加成 < 100）
             let d = shanghai(type, v, n, p);
             let cx = critX(type, v, p);
             results.push({ d, combo, cx });
@@ -670,6 +678,7 @@
     const critBonus = document.getElementById('critBonus');
     const cdBonus = document.getElementById('cdBonus');
     const slamBonus = document.getElementById('slamBonus');
+    const comboBonus = document.getElementById('comboBonus');
     const exInput = document.getElementById('exInput');
     const topKInput = document.getElementById('topK');
     const ziSpecInput = document.getElementById('ziSpecInput');
@@ -698,6 +707,7 @@
             critB: parseFloat(critBonus.value) || 0,
             cdB: parseFloat(cdBonus.value) || 0,
             slamBonus: parseFloat(slamBonus.value) || 0,
+            comboBonus: parseFloat(comboBonus.value) || 0,
             ex: parseFloat(exInput.value) || 0,
             critMode: critMode,
             threshold: threshold,
