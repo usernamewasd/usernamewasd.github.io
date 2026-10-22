@@ -725,11 +725,27 @@
 
     // ======================== 图表 ========================
     const CHART_NOTE_BASE = "※ 每个点代表该源力石数量下伤害最高的配卡。";
-    // 点的颜色只跟紫卡绑定：同一张紫卡在所有曲线里颜色一致。黄金角散开 50 个色相。
-    function ziColor(ziIdx) {
-        return `hsl(${(ziIdx * 137.508) % 360}, 68%, ${ziIdx % 2 ? 42 : 54}%)`;
+    // 点的颜色只跟紫卡绑定：同一张紫卡在所有曲线里颜色一致。
+    // 用黑/灰/红/蓝/绿/黄/橙/紫/粉/棕等定性色打底，50 张紫卡按 24 色循环；
+    // 第 2 轮（编号 24 起）用同色系加深版，避免和第一轮的紫卡撞成一样。
+    const ZI_BASE = [
+        '#000000', '#00acc1', '#ec407a', '#b71c1c', '#4e342e', '#e53935', '#795548', '#616161',
+        '#0d47a1', '#9e9d24', '#1e88e5', '#2e7d32', '#006064', '#f9a825', '#fb8c00', '#4a148c',
+        '#ad1457', '#8e24aa', '#d81b60', '#7cb342', '#00897b', '#e65100', '#3949ab', '#c49000'
+    ];
+    function shadeHex(hex, f) {
+        const n = parseInt(hex.slice(1), 16);
+        const r = Math.round(((n >> 16) & 255) * f);
+        const g = Math.round(((n >> 8) & 255) * f);
+        const b = Math.round((n & 255) * f);
+        return '#' + ((r << 16) | (g << 8) | b).toString(16).padStart(6, '0');
     }
-    // 四组曲线画在同一张图上：点形状区分组合，虚线统一灰色，点的颜色区分紫卡
+    function ziColor(ziIdx) {
+        const base = ZI_BASE[ziIdx % ZI_BASE.length];
+        return ziIdx < ZI_BASE.length ? base : shadeHex(base, 0.62);
+    }
+
+    // 四组曲线：普通/圣洁 × 初重/渐强（点形状区分组合，虚线灰色）
     const CHART_LINE_COLOR = '#9ca3af';
     const CHART_COMBOS = [
         { type: 1, mode: MODE_INITIAL,   label: '普通·初重', style: 'circle' },
