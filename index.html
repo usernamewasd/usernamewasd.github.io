@@ -391,17 +391,12 @@
     buildZiCards();
 
     // 普通/圣洁倾向都是 1.2，不再按 125/135 缩放，所以紫卡数值原样复制即可。
-    // override 用于模拟"某张紫卡连击词条 roll 偏低"（scale 乘在连击列上）。
     // 返回 [{ idx, card }]：idx 是全局紫卡编号（zi_name/zi_lookup 的键），渐强模式会滤掉带连击词条的。
-    function makeZiCards(override, mode) {
+    function makeZiCards(mode) {
         let cards = [];
         for (let i = 0; i < zi_list.length; i++) {
             if (mode === MODE_CRESCENDO && zi_hasCombo[i]) continue;
-            let card = zi_list[i].slice();
-            if (override && override.ziIdx === i) {
-                card = card.map((x, k) => k === 2 ? x * override.scale : x);
-            }
-            cards.push({ idx: i, card });
+            cards.push({ idx: i, card: zi_list[i].slice() });
         }
         return cards;
     }
@@ -675,12 +670,12 @@
     // 固定占位的卡数：初重有镀层线圈，渐强不用线圈
     function fixedSlots(p) { return p.mode === MODE_CRESCENDO ? 0 : FIXED_SLOTS; }
 
-    function fenxi(type, n, p, topK, verbose = false, ziComboOverride = null) {
+    function fenxi(type, n, p, topK, verbose = false) {
         const comboLen = p.slots - fixedSlots(p) - 1;   // 带紫卡：总卡数 - 固定卡 - 1(紫卡)
         if (comboLen < 0) {
             return verbose ? "❌ 总卡数 n 至少为 2（1 张线圈 + 1 张紫卡）；只带线圈请用「无紫卡排名」" : [];
         }
-        const results = enumerate(type, n, p, comboLen, makeZiCards(ziComboOverride, p.mode));
+        const results = enumerate(type, n, p, comboLen, makeZiCards(p.mode));
         if (!verbose) return results;
         const top = results.slice(0, topK);
         let out = resultHead(type, n, p)
@@ -797,9 +792,12 @@
                 let top = res[0];
                 pts.push({ n, ziIdx: top.ziIdx, dmgM: top.d / 1e6 });
                 if (comboRollNote(top)) {
-                    // 把这张紫卡的连击词条按最低 roll 重算（其余不变），看最优会不会换紫卡
-                    let low = fenxi(combo.type, n, pm, 1, false, { ziIdx: top.ziIdx, scale: 9 / 11 });
-                    deps.push({ n, type: combo.type, mode: combo.mode, top, low: low.length ? low[0] : null });
+                    // 按满 roll 排名从第 2 名往下找，第一个低 roll 也不掉档的配卡就是低 roll 时的替代
+                    let alt = null;
+                    for (let k = 1; k < res.length; k++) {
+                        if (!comboRollNote(res[k])) { alt = res[k]; break; }
+                    }
+                    deps.push({ n, type: combo.type, mode: combo.mode, top, alt });
                 }
             }
             comboData.push({ combo, pts });
@@ -894,20 +892,20 @@
         for (const d of deps) {
             const label = `${typeName(d.type)} · ${modeLabel(d.mode)}`;
             let kind, nm, key;
-            if (!d.low) { kind = 'none'; nm = ''; key = label + '|none'; }
-            else if (d.low.ziIdx === d.top.ziIdx) { kind = 'same'; nm = zi_name[d.top.ziIdx]; key = label + '|same|' + d.top.ziIdx; }
-            else { kind = 'diff'; nm = zi_name[d.low.ziIdx]; key = label + '|diff|' + d.low.ziIdx; }
-            if (!groups.has(key)) groups.set(key, { label, kind, nm, ns: [] });
+            if (!d.alt) { kind = 'none'; nm = ''; key = label + '|none'; }
+            else if (d.alt.ziIdx === d.top.ziIdx) { kind = 'same'; nm = zi_name[d.top.ziIdx]; key = label + '|same|' + d.top.ziIdx; }
+            else { kind = 'diff'; nm = zi_name[d.alt.ziIdx]; key = label + '|diff|' + d.alt.ziIdx; }
+            if (!groups.has(key)) groups.set(key, { label, kind, nm, ns: [], topName: zi_name[d.top.ziIdx] });
             groups.get(key).ns.push(d.n);
         }
         const lines = [];
         for (const g of groups.values()) {
-            if (g.kind === 'none') lines.push(`${g.label} 紫陶 ${groupRanges(g.ns)}：连击词条低 roll 后没有可用配卡`);
-            else if (g.kind === 'same') lines.push(`${g.label} 紫陶 ${groupRanges(g.ns)}：连击词条低 roll 时仍是「${g.nm}」，只是伤害掉一档`);
-            else lines.push(`${g.label} 紫陶 ${groupRanges(g.ns)}：连击词条低 roll 时会换成「${g.nm}」`);
+            if (g.kind === 'none') lines.push(`${g.label} 紫陶 ${groupRanges(g.ns)}：低 roll 时找不到不掉档的替代，仍是「${g.topName}」，伤害掉一档`);
+            else if (g.kind === 'same') lines.push(`${g.label} 紫陶 ${groupRanges(g.ns)}：低 roll 时仍是「${g.nm}」`);
+            else lines.push(`${g.label} 紫陶 ${groupRanges(g.ns)}：低 roll 时会换成「${g.nm}」`);
         }
         noteEl.innerHTML = CHART_NOTE_BASE
-            + ` <span style="color:#b45309; font-weight:600;">⚠️ 以下点的最优配卡依赖紫卡连击词条接近满 roll（只把该点这张紫卡的连击词条按最低 roll 重算，其余按满 roll 计）：<br>`
+            + ` <span style="color:#b45309; font-weight:600;">⚠️ 以下点的最优配卡依赖紫卡连击词条接近满 roll：<br>`
             + lines.join('<br>') + `</span>`;
     }
 
