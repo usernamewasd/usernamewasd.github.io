@@ -153,7 +153,7 @@
             </div>
         </div>
 
-        <!-- 第二行：执法者类型 + 各类加成 + 蛇主 -->
+        <!-- 第二行：执法者类型 / 紫陶数 / 蛇主数 -->
         <div class="param-bar">
             <div class="param-item">
                 <label for="typeSelect">⚙️ 执法者类型</label>
@@ -166,6 +166,18 @@
                 <label for="nInput">💎 紫陶源力石数量</label>
                 <input type="number" id="nInput" min="0" max="9" value="0" step="1">
             </div>
+            <div class="param-item">
+                <label for="niraSel">🐍 蛇主数</label>
+                <select id="niraSel">
+                    <option value="0">不带 (0%)</option>
+                    <option value="1">1件 (+150%)</option>
+                    <option value="2" selected>2件 (+300%)</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- 第三行：各类加成 -->
+        <div class="param-bar">
             <div class="param-item">
                 <label for="baseBonus">▸ 基伤加成</label>
                 <input type="number" id="baseBonus" value="0" step="0.1">
@@ -194,17 +206,9 @@
                 <label for="exInput">▸ 额外伤害加成</label>
                 <input type="number" id="exInput" value="0" step="0.01">
             </div>
-            <div class="param-item">
-                <label for="niraSel">🐍 蛇主数</label>
-                <select id="niraSel">
-                    <option value="0">不带 (0%)</option>
-                    <option value="1">1件 (+150%)</option>
-                    <option value="2" selected>2件 (+300%)</option>
-                </select>
-            </div>
         </div>
 
-        <!-- 第三行：总卡数 / 显示前几名 / 暴击等级处理 -->
+        <!-- 第四行：总卡数 / 显示前几名 / 暴击等级处理 -->
         <div class="param-bar">
             <div class="param-item">
                 <label for="slotCount">🎴 总卡数 n</label>
@@ -238,7 +242,7 @@
 
         <div class="fixed-card">
             <span class="badge">🎴 紫卡词条 (用于固定紫卡排名)</span>
-            <input type="text" id="ziSpecInput" placeholder="例: 震地/暴击/毒  或  震地2.19/暴击2.5/爆伤1.2">
+            <input type="text" id="ziSpecInput" placeholder="例: 震地/暴击/毒  或  震地1.955/暴击5.881/爆伤1.47">
             <span id="ziWarn" style="font-size:0.78rem; font-weight:700; color:#b91c1c; display:none;"></span>
         </div>
     </div>
@@ -354,7 +358,6 @@
 
     const MELEE_SLOTS = 8;
     const FIXED_SLOTS = 1;
-    const POOL_SIZE = KA.length;   // 15（初重只用前 11 张）
 
     // ======================== 紫卡生成 ========================
     let zi_list = [], zi_name = [], zi_lookup = new Map();
@@ -601,12 +604,13 @@
     // 连击词条浮动提示：按满 roll 能到的连击倍率，若连击词条取最低 roll（0.9/1.1）会掉档，
     // 说明这条结果依赖连击词条接近满值；稳定不掉档的（如线圈+邪恶蓄力+三词条）不标。
     function comboRollNote(r) {
-        if (r.mode === MODE_CRESCENDO) return '';   // 渐强锁定 12x，不存在连击浮动
+        const mode = r.mode || MODE_INITIAL;
+        if (mode === MODE_CRESCENDO) return '';   // 渐强基数固定，不吃连击词条浮动
         const ziCombo = r.ziCombo || 0;
         if (!(ziCombo > 0)) return '';
-        const hi = comboMult(MODE_INITIAL, r.comboTotal);
+        const hi = comboMult(mode, r.comboTotal);
         const loTotal = r.comboTotal - ziCombo + ziCombo * 9 / 11;   // 连击词条按最低 roll
-        const lo = comboMult(MODE_INITIAL, loTotal);
+        const lo = comboMult(mode, loTotal);
         return lo < hi ? ` ⚠️连击词条近满roll才 ${hi}x（低roll ${lo}x）` : '';
     }
 
@@ -653,6 +657,16 @@
         return results;
     }
 
+    // 没有可用配卡时的提示：渐强的连击基数和初重不同
+    function emptyResultNote(p, withDetail) {
+        if (p.mode === MODE_CRESCENDO) {
+            return "⚠️ 当前连击加成把所有配卡压到 100 连击以下，开不了灵化（渐强基数是 220 连击）";
+        }
+        return withDetail
+            ? "⚠️ 当前卡数下没有任何配卡能凑够 100 连击开启灵化（线圈 +80，还需邪恶蓄力 / 紫卡连击词条 / 连击加成 ≥ 20）"
+            : "⚠️ 当前卡数下没有任何配卡能凑够 100 连击开启灵化（线圈 +80）";
+    }
+
     // 结果头第一行：类型 / 紫陶数 / 总卡数 / 暴击模式
     function resultHead(type, n, p) {
         return `${typeName(type)}, 紫陶源力石数量=${n}, 总卡数=${p.slots} | 暴击模式: ${getCritModeDescription(p.critMode, p.threshold)}\n`;
@@ -673,7 +687,7 @@
                 + `基伤+${p.baseB}, 元素+${p.elemB}, 暴击+${p.critB}, 爆伤+${p.cdB}, 震地+${p.slamBonus}, 连击+${p.comboBonus}, 额外伤害加成=${p.ex}\n`
                 + `蛇主${(p.nira/NIRA_PER).toFixed(0)}件(+${fmtPct(p.nira)}震地) | 伤害前${top.length}（共 ${results.length} 组）:\n`
                 + "─".repeat(104) + "\n"
-                + (top.length ? renderRows(top) : "⚠️ 当前卡数下没有任何配卡能凑够 100 连击开启灵化（线圈 +80）")
+                + (top.length ? renderRows(top) : emptyResultNote(p, false))
                 + "\n" + "─".repeat(104);
         return out;
     }
@@ -718,7 +732,7 @@
                 + "─".repeat(104) + "\n"
                 + (top.length
                     ? renderRows(top, ziLabel)
-                    : "⚠️ 当前卡数下没有任何配卡能凑够 100 连击开启灵化（线圈 +80，还需邪恶蓄力 / 紫卡连击词条 / 连击加成 ≥ 20）")
+                    : emptyResultNote(p, true))
                 + "\n" + "─".repeat(104);
         return out;
     }
@@ -729,29 +743,31 @@
     // 用黑/灰/红/蓝/绿/黄/橙/紫/粉/棕等定性色打底，50 张紫卡按 24 色循环；
     // 第 2 轮（编号 24 起）用同色系加深版，避免和第一轮的紫卡撞成一样。
     const ZI_BASE = [
-        '#000000', '#00acc1', '#ec407a', '#b71c1c', '#4e342e', '#e53935', '#795548', '#616161',
+        '#263238', '#00acc1', '#ec407a', '#b71c1c', '#4e342e', '#e53935', '#795548', '#616161',
         '#0d47a1', '#9e9d24', '#1e88e5', '#2e7d32', '#006064', '#f9a825', '#fb8c00', '#4a148c',
         '#ad1457', '#8e24aa', '#d81b60', '#7cb342', '#00897b', '#e65100', '#3949ab', '#c49000'
     ];
     function shadeHex(hex, f) {
         const n = parseInt(hex.slice(1), 16);
-        const r = Math.round(((n >> 16) & 255) * f);
-        const g = Math.round(((n >> 8) & 255) * f);
-        const b = Math.round((n & 255) * f);
+        const r = Math.min(255, Math.round(((n >> 16) & 255) * f));
+        const g = Math.min(255, Math.round(((n >> 8) & 255) * f));
+        const b = Math.min(255, Math.round((n & 255) * f));
         return '#' + ((r << 16) | (g << 8) | b).toString(16).padStart(6, '0');
     }
     function ziColor(ziIdx) {
         const base = ZI_BASE[ziIdx % ZI_BASE.length];
-        return ziIdx < ZI_BASE.length ? base : shadeHex(base, 0.62);
+        if (ziIdx < ZI_BASE.length) return base;                 // 第 1 轮：原色
+        if (ziIdx < ZI_BASE.length * 2) return shadeHex(base, 0.62);  // 第 2 轮：加深
+        return shadeHex(base, 1.35);                              // 第 3 轮（48、49）：提亮
     }
 
     // 四组曲线：普通/圣洁 × 初重/渐强（点形状区分组合，虚线灰色）
     const CHART_LINE_COLOR = '#9ca3af';
     const CHART_COMBOS = [
-        { type: 1, mode: MODE_INITIAL,   label: '普通·初重', style: 'circle' },
-        { type: 1, mode: MODE_CRESCENDO, label: '普通·渐强', style: 'rect' },
-        { type: 2, mode: MODE_INITIAL,   label: '圣洁·初重', style: 'triangle' },
-        { type: 2, mode: MODE_CRESCENDO, label: '圣洁·渐强', style: 'rectRot' }
+        { type: 1, mode: MODE_INITIAL,   style: 'circle' },
+        { type: 1, mode: MODE_CRESCENDO, style: 'rect' },
+        { type: 2, mode: MODE_INITIAL,   style: 'triangle' },
+        { type: 2, mode: MODE_CRESCENDO, style: 'rectRot' }
     ];
     let currentChart = null;
 
@@ -791,7 +807,7 @@
 
         let datasets = [];
         // 曲线分段：同一紫卡的相邻点用该紫卡颜色的粗虚线；跨紫卡用灰色细虚线
-        for (const { combo, pts } of comboData) {
+        for (const { pts } of comboData) {
             for (let i = 0; i < pts.length - 1; i++) {
                 const a = pts[i], b = pts[i + 1];
                 const same = a.ziIdx === b.ziIdx;
