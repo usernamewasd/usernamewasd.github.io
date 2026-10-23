@@ -137,7 +137,7 @@
                 • 魔导侵略：+300%爆伤，相当于4个紫陶<br>
                 • 灵化自带：自带+1基伤，灵化还会把面板提升到730（普通）/740（圣洁）<br>
                 • 自定义紫卡也可直接输入面板数值，<b>暴击不需要乘2</b>。输入示例：基伤/暴击  或者  基伤2/暴击2/震地2<br>
-                • 额外加成（均为简单加法）：基伤加成加在总基伤区；元素加成加在总元素区；暴击加成加在暴击率 x 上；爆伤加成加在爆伤倍率 y 上；震地加成加在震地区；连击加成加在总连击数上；额外伤害加成是伤害 × (1 + 此值)<br>
+                • 额外加成（均为简单加法）：基伤加成加在总基伤区；元素加成加在总元素区；暴击加成加在暴击率 x 上；爆伤加成加在爆伤倍率 y 上；震地加成加在震地区；连击加成加在总连击数上；额外伤害加成是伤害 × (1 + 此值)；偷袭爆伤加成直接加到暴击倍率 f 上（满级 +700% 填 7），不受暴击等级影响<br>
                 • 暴击等级：<b>期望伤害</b>用 f = 1 + x·(y-1)；<b>暴击下限</b> N=⌊x⌋；<b>暴击上限</b> N=⌈x⌉；<b>自定义阈值</b>小数部分≥阈值则进位；暴击等级 N 的伤害倍率 f = 1 + N·(y-1)</p>
             </div>
         </div>
@@ -205,6 +205,10 @@
             <div class="param-item">
                 <label for="exInput">▸ 额外伤害加成</label>
                 <input type="number" id="exInput" value="0" step="0.01">
+            </div>
+            <div class="param-item">
+                <label for="sneakBonus">▸ 偷袭爆伤加成</label>
+                <input type="number" id="sneakBonus" value="0" step="0.1">
             </div>
         </div>
 
@@ -461,6 +465,7 @@
         let x = critRate(type, v, p, totalCombo);
         let y = y0 * (1 + v[4] + 0.75 * n) + p.cdB;
         let { f } = getCritMultiplier(x, y, p.critMode, p.threshold);
+        f += p.sneak || 0;   // 偷袭爆伤加成：不受暴击等级影响，直接加到暴击倍率 f 上（满级 +700% 填 7）
 
         // 震地：各来源相加，再作为独立乘区
         // 注意：震波的 +200% 已包含在 KA 里「震波」那一行的第6列（v[6]），这里不能再加一次
@@ -920,6 +925,7 @@
     const slamBonus = document.getElementById('slamBonus');
     const comboBonus = document.getElementById('comboBonus');
     const exInput = document.getElementById('exInput');
+    const sneakInput = document.getElementById('sneakBonus');
     const topKInput = document.getElementById('topK');
     const slotInput = document.getElementById('slotCount');
     const ziSpecInput = document.getElementById('ziSpecInput');
@@ -956,6 +962,7 @@
             slamBonus: parseFloat(slamBonus.value) || 0,
             comboBonus: parseFloat(comboBonus.value) || 0,
             ex: parseFloat(exInput.value) || 0,
+            sneak: parseFloat(sneakInput.value) || 0,
             critMode: critMode,
             threshold: threshold,
             nira: niraCount * NIRA_PER,
